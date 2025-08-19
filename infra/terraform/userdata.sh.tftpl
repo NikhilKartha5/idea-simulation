@@ -1,31 +1,56 @@
 #!/bin/bash
-set -xeuo pipefail
+set -u
+LOG=/var/log/ideas-bootstrap.log
+exec > >(tee -a "$LOG") 2>&1
+echo "== Bootstrapping ideas stack =="
+echo "Initial disk usage:"; df -h /
 amazon-linux-extras enable docker || true
 yum install -y docker awscli
+yum install -y amazon-ssm-agent || true
 systemctl enable docker
 systemctl start docker
+systemctl enable amazon-ssm-agent || true
+systemctl start amazon-ssm-agent || true
+usermod -aG docker ec2-user || true
+echo "Logging into ECR"
 aws ecr get-login-password --region ${region} | docker login --username AWS --password-stdin ${registry}
-# Pull images (expect they are already pushed):
+echo "Pulling images"
 %{ for svc in services ~}
-docker pull ${registry}/ideas-${svc}:${image_tag} || true
+docker pull ${registry}/ideas-${svc}:${image_tag} || echo "WARN: pull failed ideas-${svc}" &
 %{ endfor ~}
-# Create network
-(docker network create ideas-net || true)
-# Run core dependencies expected external (NOTE: In production you would use managed services RDS/ElastiCache/RabbitMQ)
-# TEMP ephemeral containers for demo
- docker run -d --name db --network ideas-net -e POSTGRES_USER=ideas -e POSTGRES_PASSWORD=ideas -e POSTGRES_DB=ideas postgres:15-alpine
- docker run -d --name redis --network ideas-net redis:7-alpine
- docker run -d --name rabbitmq --network ideas-net -p 15672:15672 rabbitmq:3-management-alpine
-# Run services (simplified: each container with shared .env passed via inline vars if needed)
-# Auth service
- docker run -d --name auth-service --network ideas-net -e POSTGRES_HOST=db -e POSTGRES_USER=ideas -e POSTGRES_PASSWORD=ideas -e POSTGRES_DB=ideas -e JWT_SECRET=changeme ${registry}/ideas-auth-service:${image_tag}
-# Idea service
- docker run -d --name idea-service --network ideas-net -e POSTGRES_HOST=db -e POSTGRES_USER=ideas -e POSTGRES_PASSWORD=ideas -e POSTGRES_DB=ideas -e REDIS_HOST=redis -e REDIS_PORT=6379 -e RABBITMQ_URL=amqp://rabbitmq:5672 ${registry}/ideas-idea-service:${image_tag}
-# Vote service
- docker run -d --name vote-service --network ideas-net -e POSTGRES_HOST=db -e POSTGRES_USER=ideas -e POSTGRES_PASSWORD=ideas -e POSTGRES_DB=ideas -e REDIS_HOST=redis -e REDIS_PORT=6379 -e RABBITMQ_URL=amqp://rabbitmq:5672 ${registry}/ideas-vote-service:${image_tag}
-# Comment service
- docker run -d --name comment-service --network ideas-net -e POSTGRES_HOST=db -e POSTGRES_USER=ideas -e POSTGRES_PASSWORD=ideas -e POSTGRES_DB=ideas -e RABBITMQ_URL=amqp://rabbitmq:5672 ${registry}/ideas-comment-service:${image_tag}
-# Gateway
- docker run -d --name gateway --network ideas-net -p 8080:8080 -e JWT_SECRET=changeme -e PORT=8080 ${registry}/ideas-gateway:${image_tag}
-# Frontend (served via node dev server or build - here assuming image exposes 5173 internally -> not behind ALB, optional)
- docker run -d --name frontend --network ideas-net -p 5173:5173 ${registry}/ideas-frontend:${image_tag}
+wait
+echo "Disk usage after pulls:"; df -h /
+echo "Top space consumers under / (max 20):"; du -h -d1 / 2>/dev/null | sort -hr | head -n 20
+docker network create ideas-net 2>/dev/null || true
+echo "Starting dependency containers"
+docker run -d --restart unless-stopped --name db --network ideas-net -e POSTGRES_USER=ideas -e POSTGRES_PASSWORD=ideas -e POSTGRES_DB=ideas postgres:15-alpine
+docker run -d --restart unless-stopped --name redis --network ideas-net redis:7-alpine
+docker run -d --restart unless-stopped --name rabbitmq --network ideas-net -p 15672:15672 rabbitmq:3-management-alpine
+echo "Waiting for Postgres to accept connections"
+until docker exec db pg_isready -U ideas -d ideas; do sleep 2; done
+sleep 3
+echo "Launching microservices"
+docker run -d --restart unless-stopped --name auth-service --network ideas-net -e POSTGRES_HOST=db -e POSTGRES_USER=ideas -e POSTGRES_PASSWORD=ideas -e POSTGRES_DB=ideas -e JWT_SECRET=changeme ${registry}/ideas-auth-service:${image_tag} || echo "WARN: auth-service failed"
+docker run -d --restart unless-stopped --name idea-service --network ideas-net -e POSTGRES_HOST=db -e POSTGRES_USER=ideas -e POSTGRES_PASSWORD=ideas -e POSTGRES_DB=ideas -e REDIS_HOST=redis -e REDIS_PORT=6379 -e RABBITMQ_URL=amqp://rabbitmq:5672 ${registry}/ideas-idea-service:${image_tag} || echo "WARN: idea-service failed"
+docker run -d --restart unless-stopped --name vote-service --network ideas-net -e POSTGRES_HOST=db -e POSTGRES_USER=ideas -e POSTGRES_PASSWORD=ideas -e POSTGRES_DB=ideas -e REDIS_HOST=redis -e REDIS_PORT=6379 -e RABBITMQ_URL=amqp://rabbitmq:5672 ${registry}/ideas-vote-service:${image_tag} || echo "WARN: vote-service failed"
+docker run -d --restart unless-stopped --name comment-service --network ideas-net -e POSTGRES_HOST=db -e POSTGRES_USER=ideas -e POSTGRES_PASSWORD=ideas -e POSTGRES_DB=ideas -e RABBITMQ_URL=amqp://rabbitmq:5672 ${registry}/ideas-comment-service:${image_tag} || echo "WARN: comment-service failed"
+echo "Delaying gateway start 5s to let dependencies warm"
+sleep 5
+docker run -d --restart unless-stopped --name gateway --network ideas-net -p 8080:8080 -e JWT_SECRET=changeme -e PORT=8080 ${registry}/ideas-gateway:${image_tag} || echo "WARN: gateway failed"
+sleep 2; docker logs gateway --tail=50 || true
+echo "Waiting for gateway /health"
+for i in {1..15}; do
+	if curl -sf http://localhost:8080/health >/dev/null; then
+		echo "Gateway healthy after $i attempts"; break; fi; sleep 2; done
+curl -s http://localhost:8080/health || true
+docker run -d --restart unless-stopped --name frontend --network ideas-net -p 5173:5173 ${registry}/ideas-frontend:${image_tag} || true
+echo "Container status:"; docker ps --format 'table {{.Names}}\t{{.Status}}'
+echo "Saving diagnostics to S3"
+docker ps > /var/log/ideas-docker-ps.txt || true
+df -h / > /var/log/ideas-disk-usage.txt || true
+du -h -d2 /var/lib/docker 2>/dev/null | sort -hr | head -n 50 > /var/log/ideas-docker-du.txt || true
+aws s3 cp /var/log/ideas-bootstrap.log s3://${bucket}/logs/ideas-bootstrap-$(date +%s).log || true
+aws s3 cp /var/log/ideas-docker-ps.txt s3://${bucket}/logs/ideas-docker-ps-$(date +%s).txt || true
+aws s3 cp /var/log/ideas-disk-usage.txt s3://${bucket}/logs/ideas-disk-usage-$(date +%s).txt || true
+aws s3 cp /var/log/ideas-docker-du.txt s3://${bucket}/logs/ideas-docker-du-$(date +%s).txt || true
+echo "Bootstrap complete"

@@ -178,6 +178,28 @@ resource "aws_iam_role_policy_attachment" "ecr_read" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
 }
 
+# Allow SSM Session Manager access
+resource "aws_iam_role_policy_attachment" "ssm_core" {
+  role       = aws_iam_role.ec2_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+}
+
+# Allow instance to upload bootstrap log to artifact bucket
+resource "aws_iam_role_policy" "s3_put_logs" {
+  name = "ideas-s3-put-logs"
+  role = aws_iam_role.ec2_role.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = ["s3:PutObject", "s3:PutObjectAcl"]
+        Resource = "arn:aws:s3:::${var.artifact_bucket_name}/*"
+      }
+    ]
+  })
+}
+
 resource "aws_iam_instance_profile" "ec2_profile" {
   name = "ideas-ec2-profile"
   role = aws_iam_role.ec2_role.name
@@ -208,6 +230,15 @@ resource "aws_launch_template" "app" {
   name_prefix   = "ideas-app-"
   image_id      = data.aws_ami.amazon_linux.id
   instance_type = var.instance_type
+  block_device_mappings {
+    device_name = "/dev/xvda"
+    ebs {
+      volume_size = var.root_volume_size
+      volume_type = "gp3"
+      encrypted   = true
+      delete_on_termination = true
+    }
+  }
   iam_instance_profile { name = aws_iam_instance_profile.ec2_profile.name }
   vpc_security_group_ids = [aws_security_group.app_sg.id]
   user_data = base64encode(templatefile("${path.module}/userdata.sh.tftpl", {
@@ -215,6 +246,7 @@ resource "aws_launch_template" "app" {
     registry    = local.registry
     image_tag   = local.image_tag
     services    = local.service_names
+  bucket      = var.artifact_bucket_name
   }))
   tag_specifications {
     resource_type = "instance"
