@@ -1,52 +1,55 @@
-# AHA Ideas Simulation
+# Idea Simulation Platform
 
-A 3-tier microservices web application for creating, discovering, voting on, and commenting on innovative ideas.
+Microservices web application for creating, searching, voting on, and commenting on ideas. Shows distributed service design, messaging, caching, CI/CD and Terraform infrastructure.
 
 ## Architecture
-- Frontend: React + TypeScript (Vite) SPA
-- API Gateway: Node.js Express (aggregates and routes to services)
-- Services (independent containers + REST + internal events):
-  - Idea Service: CRUD ideas, search, tagging
-  - Vote Service: Up/down votes, ranking
-  - Comment Service: Threaded comments
-- Data Stores:
-  - PostgreSQL (ideas, comments, votes)
-  - Redis (caching hot ideas, rate limiting)
-- Messaging / Async Events: RabbitMQ (idea_created, vote_cast, comment_added)
-- CI/CD: Jenkins pipeline building, testing, containerizing, and deploying to AWS EC2 behind an Application Load Balancer with auto scaling groups.
-- Containerization: Docker & docker-compose for local dev.
-- Infrastructure as Code: Terraform (VPC, subnets, security groups, ALB, ASGs, RDS, ElastiCache, EC2, IAM roles, SSM parameters)
+- Frontend: React + TypeScript (Vite)
+- API Gateway: Node.js / Express (routing, auth, security headers)
+- Services:
+  - Auth Service (JWT issuance)
+  - Idea Service (CRUD + search)
+  - Vote Service (vote tally & ranking)
+  - Comment Service (threaded comments)
+- Event Bus: RabbitMQ (idea.created, vote.cast, comment.created)
+- Data Stores: PostgreSQL (primary), Redis (cache / rankings)
+- Containerization: Docker (local compose), images in ECR
+- Infrastructure: Terraform (VPC, subnets, SGs, ALB, Auto Scaling Group, EC2, IAM). Local demo uses in‑instance Postgres/Redis/RabbitMQ; production would use managed services (RDS, ElastiCache, Amazon MQ).
+- CI/CD: Jenkins pipeline (lint, test, build, push, infra apply placeholder)
 
-## Local Development Quick Start
-```
-# 1. Copy sample envs
+## Local Development
+```bash
 cp .env.example .env
-# 2. Start all services
 docker compose up --build
-# 3. Open frontend at http://localhost:5173
+# Frontend: http://localhost:5173
+# Gateway:  http://localhost:8080/health
 ```
 
-## High-Level Data Flow
-1. User creates idea (Frontend -> Gateway -> Idea Service -> PostgreSQL -> event -> queue)
-2. Other services consume events for denormalized projections / cache invalidation.
-3. Votes & comments follow similar path; rankings served from Redis for speed.
+### Basic API Flow
+1. Register -> /api/auth/register
+2. Login -> /api/auth/login (get JWT)
+3. Create idea -> /api/ideas
+4. Vote -> /api/votes
+5. Comment -> /api/comments
+6. Search -> /api/ideas/search?q=term
+7. Top ideas -> /api/ideas/top
 
-## Jenkins Pipeline Stages
-1. Checkout
-2. Install & Cache dependencies
-3. Lint & Test (services + frontend)
-4. Build Docker images
-5. Security scan (Trivy)
-6. Push images to ECR
-7. Terraform plan & apply (separate approval for prod)
-8. Rolling deploy to ASG / ECS (future option)
-9. Post-deploy smoke tests
+## Deployment (Current State)
+Deployed on AWS EC2 inside an Auto Scaling Group behind an Application Load Balancer. User data (and/or manual steps) pull images from ECR and run containers. Root volume enlarged to 30GB to fit images. Health check: `GET /health` on gateway (port 8080) returns 200 through ALB.
 
-## Next Steps
-- Fill service implementations
-- Add unit/integration tests
-- Implement search (pg_trgm / full-text)
-- Add WebSocket/Server-Sent Events for live updates
+### Future Hardening
+- Move Postgres/Redis/RabbitMQ to managed services (RDS / ElastiCache / Amazon MQ)
+- Store secrets (JWT_SECRET, DB creds) in SSM Parameter Store / Secrets Manager
+- CloudWatch log shipping (or OpenTelemetry collector)
+- Add metrics & traces
+- Automated zero-downtime rolling refresh (instance refresh or blue/green)
+- Multi-stage Docker builds with smaller runtime images
 
----
-This repository is an educational simulation designed to showcase full-stack microservices proficiency.
+## Roadmap
+- Add integration tests & smoke tests in pipeline
+- Implement event consumers & projections
+- Realtime updates (WebSocket / SSE)
+- Security scanning (Trivy, Syft) + SBOM
+- Observability stack
+
+## Educational Purpose
+This repository is an educational simulation; not production hardened. Use as a learning scaffold.
