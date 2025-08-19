@@ -1,0 +1,31 @@
+#!/bin/bash
+set -xeuo pipefail
+amazon-linux-extras enable docker || true
+yum install -y docker awscli
+systemctl enable docker
+systemctl start docker
+aws ecr get-login-password --region ${region} | docker login --username AWS --password-stdin ${registry}
+# Pull images (expect they are already pushed):
+%{ for svc in services ~}
+docker pull ${registry}/ideas-${svc}:${image_tag} || true
+%{ endfor ~}
+# Create network
+(docker network create ideas-net || true)
+# Run core dependencies expected external (NOTE: In production you would use managed services RDS/ElastiCache/RabbitMQ)
+# TEMP ephemeral containers for demo
+ docker run -d --name db --network ideas-net -e POSTGRES_USER=ideas -e POSTGRES_PASSWORD=ideas -e POSTGRES_DB=ideas postgres:15-alpine
+ docker run -d --name redis --network ideas-net redis:7-alpine
+ docker run -d --name rabbitmq --network ideas-net -p 15672:15672 rabbitmq:3-management-alpine
+# Run services (simplified: each container with shared .env passed via inline vars if needed)
+# Auth service
+ docker run -d --name auth-service --network ideas-net -e POSTGRES_HOST=db -e POSTGRES_USER=ideas -e POSTGRES_PASSWORD=ideas -e POSTGRES_DB=ideas -e JWT_SECRET=changeme ${registry}/ideas-auth-service:${image_tag}
+# Idea service
+ docker run -d --name idea-service --network ideas-net -e POSTGRES_HOST=db -e POSTGRES_USER=ideas -e POSTGRES_PASSWORD=ideas -e POSTGRES_DB=ideas -e REDIS_HOST=redis -e REDIS_PORT=6379 -e RABBITMQ_URL=amqp://rabbitmq:5672 ${registry}/ideas-idea-service:${image_tag}
+# Vote service
+ docker run -d --name vote-service --network ideas-net -e POSTGRES_HOST=db -e POSTGRES_USER=ideas -e POSTGRES_PASSWORD=ideas -e POSTGRES_DB=ideas -e REDIS_HOST=redis -e REDIS_PORT=6379 -e RABBITMQ_URL=amqp://rabbitmq:5672 ${registry}/ideas-vote-service:${image_tag}
+# Comment service
+ docker run -d --name comment-service --network ideas-net -e POSTGRES_HOST=db -e POSTGRES_USER=ideas -e POSTGRES_PASSWORD=ideas -e POSTGRES_DB=ideas -e RABBITMQ_URL=amqp://rabbitmq:5672 ${registry}/ideas-comment-service:${image_tag}
+# Gateway
+ docker run -d --name gateway --network ideas-net -p 8080:8080 -e JWT_SECRET=changeme -e PORT=8080 ${registry}/ideas-gateway:${image_tag}
+# Frontend (served via node dev server or build - here assuming image exposes 5173 internally -> not behind ALB, optional)
+ docker run -d --name frontend --network ideas-net -p 5173:5173 ${registry}/ideas-frontend:${image_tag}
