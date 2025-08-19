@@ -1,23 +1,13 @@
 import React, { useState } from 'react';
+import { apiPost } from '../api.js';
 
-export function Auth(){
-  const [email,setEmail] = useState('user@example.com');
-  const [password,setPassword] = useState('password');
-  const [token,setToken] = useState(localStorage.getItem('token')||'');
+// Auth removed; placeholder to avoid import errors if any stale references remain.
+export function Auth(){ return null; }
 
-  async function register(e){ e.preventDefault(); await fetch('/api/auth/register',{method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ email, password })}); }
-  async function login(e){ e.preventDefault(); const r= await fetch('/api/auth/login',{method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ email, password })}); const d= await r.json(); if(d.token){ localStorage.setItem('token', d.token); setToken(d.token); } }
-  function logout(){ localStorage.removeItem('token'); setToken(''); }
-
-  return <div style={{marginBottom:'1rem'}}>
-    <h3>Auth</h3>
-    {token ? <div>Logged in <button onClick={logout}>Logout</button></div> : (
-      <form onSubmit={login} style={{display:'flex', gap:'0.5rem'}}>
-        <input value={email} onChange={e=>setEmail(e.target.value)} placeholder='email' />
-        <input type='password' value={password} onChange={e=>setPassword(e.target.value)} placeholder='password' />
-        <button type='submit'>Login</button>
-        <button onClick={register} type='button'>Register</button>
-      </form>
-    )}
-  </div>;
-}
+const styles = {
+  box:{display:'flex', flexDirection:'column', gap:8, padding:'0.75rem 1rem', background:'#f9fafb', border:'1px solid #e4e7ec', borderRadius:8, minWidth:260},
+  field:{display:'flex', flexDirection:'column', gap:4, fontSize:12},
+  btn:{background:'#155eef', color:'#fff', border:'none', padding:'0.5rem .9rem', borderRadius:6, cursor:'pointer'},
+  btnOutline:{background:'#fff', color:'#155eef', border:'1px solid #155eef', padding:'0.5rem .9rem', borderRadius:6, cursor:'pointer'},
+  error:{background:'#ffe4e6', color:'#b42318', padding:'0.35rem 0.5rem', borderRadius:4, fontSize:12}
+};

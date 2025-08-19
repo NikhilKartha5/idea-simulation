@@ -25,13 +25,13 @@ docker compose up --build
 ```
 
 ### Basic API Flow
-1. Register -> /api/auth/register
-2. Login -> /api/auth/login (get JWT)
-3. Create idea -> /api/ideas
-4. Vote -> /api/votes
-5. Comment -> /api/comments
-6. Search -> /api/ideas/search?q=term
-7. Top ideas -> /api/ideas/top
+1. Create idea -> /api/ideas
+2. Vote -> /api/votes
+3. Comment -> /api/comments
+4. Search -> /api/ideas/search?q=term
+5. Top ideas -> /api/ideas/top
+
+Auth temporarily disabled: endpoints are open (no JWT required) for simplified demo.
 
 ## Deployment (Current State)
 Deployed on AWS EC2 inside an Auto Scaling Group behind an Application Load Balancer. User data (and/or manual steps) pull images from ECR and run containers. Root volume enlarged to 30GB to fit images. Health check: `GET /health` on gateway (port 8080) returns 200 through ALB.

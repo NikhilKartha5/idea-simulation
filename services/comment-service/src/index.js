@@ -34,5 +34,11 @@ app.post('/comments', async (req, res) => {
   res.status(201).json(doc);
 });
 
+app.get('/comments/:idea_id', async (req, res) => {
+  const { idea_id } = req.params;
+  const { rows } = await pool.query('SELECT id, idea_id, content, created_at FROM comments WHERE idea_id=$1 ORDER BY created_at ASC', [idea_id]);
+  res.json(rows);
+});
+
 const port = process.env.SERVICE_PORT || 3003;
 app.listen(port, () => console.log(`Comment service on ${port}`));

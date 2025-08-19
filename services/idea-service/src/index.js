@@ -31,7 +31,14 @@ let channel;
 app.get('/health', (_req, res) => res.json({ status: 'ok' }));
 
 app.get('/ideas', async (_req, res) => {
-  const { rows } = await pool.query('SELECT id, title, description, created_at FROM ideas ORDER BY created_at DESC LIMIT 50');
+  // Include aggregated score so frontend can display live vote counts.
+  const { rows } = await pool.query(`
+    SELECT i.id, i.title, i.description, i.created_at, COALESCE(SUM(v.direction),0) AS score
+    FROM ideas i
+    LEFT JOIN votes v ON v.idea_id = i.id
+    GROUP BY i.id
+    ORDER BY i.created_at DESC
+    LIMIT 50`);
   res.json(rows);
 });
 
