@@ -83,3 +83,6 @@ Deployed (simulation) on AWS EC2 inside an Auto Scaling Group behind an Applicat
 
 ## Educational Purpose
 This repository is an educational simulation; not production hardened. Use as a learning scaffold.
+
+## License
+Released under the MIT License. See `LICENSE` for details.
