@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import axios from 'axios';
+import { requireAuth } from '../authMiddleware.js';
 
 export const ideasRouter = Router();
 const IDEA_BASE = 'http://idea-service:3001';
@@ -17,7 +18,7 @@ ideasRouter.get('/search', async (req, res) => {
   const { data } = await axios.get(`${IDEA_BASE}/ideas/search`, { params: { q } });
   res.json(data);
 });
-ideasRouter.post('/', async (req, res) => {
+ideasRouter.post('/', requireAuth, async (req, res) => {
   const { data } = await axios.post(`${IDEA_BASE}/ideas`, req.body);
   res.status(201).json(data);
 });

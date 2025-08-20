@@ -1,9 +1,18 @@
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
+-- NOTE: Original ordering created the votes table before the users table, causing the
+-- foreign key reference (users.id) to fail and the votes table to be skipped.
+-- Reordered: ideas -> users -> votes -> comments.
 CREATE TABLE IF NOT EXISTS ideas (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   title TEXT NOT NULL,
   description TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS users (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  email TEXT NOT NULL UNIQUE,
+  password_hash TEXT NOT NULL,
   created_at TIMESTAMPTZ DEFAULT now()
 );
 CREATE TABLE IF NOT EXISTS votes (
@@ -18,13 +27,6 @@ CREATE TABLE IF NOT EXISTS comments (
   id BIGSERIAL PRIMARY KEY,
   idea_id UUID NOT NULL REFERENCES ideas(id) ON DELETE CASCADE,
   content TEXT NOT NULL,
-  created_at TIMESTAMPTZ DEFAULT now()
-);
-
-CREATE TABLE IF NOT EXISTS users (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  email TEXT NOT NULL UNIQUE,
-  password_hash TEXT NOT NULL,
   created_at TIMESTAMPTZ DEFAULT now()
 );
 

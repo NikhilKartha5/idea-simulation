@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from 'react';
+import { useAuth } from '../main.jsx';
+import { useRoute } from '../main.jsx';
 import { apiFetch } from '../api.js';
 import { NewIdea } from './NewIdea.jsx';
 import { Search } from './Search.jsx';
@@ -6,6 +8,9 @@ import { TopIdeas } from './TopIdeas.jsx';
 import { IdeaList } from './IdeaList.jsx';
 
 export function AppShell(){
+  const { token } = useAuth();
+  const { navigate } = useRoute();
+  useEffect(()=>{ if(!token) navigate('/login'); },[token]);
   const [ideas,setIdeas] = useState([]);
   const [loading,setLoading] = useState(false);
   const [error,setError] = useState('');

@@ -1,9 +1,10 @@
 import { Router } from 'express';
 import axios from 'axios';
+import { requireAuth } from '../authMiddleware.js';
 import crypto from 'crypto';
 export const votesRouter = Router();
 const VOTE_BASE = 'http://vote-service:3002';
-votesRouter.post('/', async (req, res) => {
+votesRouter.post('/', requireAuth, async (req, res) => {
 	try {
 		// Derive stable UUID from IP hash for anonymous mode
 		const hex = crypto.createHash('sha256').update(req.ip).digest('hex');

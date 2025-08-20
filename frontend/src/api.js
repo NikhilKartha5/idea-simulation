@@ -12,7 +12,11 @@ async function handle(r){
   return data;
 }
 
-export function apiFetch(path, opts={}){ return fetch(API_BASE + path, opts).then(handle); }
+export function apiFetch(path, opts={}){
+  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+  const headers = { ...(opts.headers||{}), ...(token? { Authorization:`Bearer ${token}` }: {}) };
+  return fetch(API_BASE + path, { ...opts, headers }).then(handle);
+}
 export function apiPost(path, json, opts={}){
   const headers = { 'Content-Type':'application/json', ...(opts.headers||{}) };
   return apiFetch(path, { method:'POST', ...opts, headers, body: JSON.stringify(json) });

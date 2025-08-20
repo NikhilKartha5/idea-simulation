@@ -10,7 +10,7 @@ export function NewIdea({ onCreated }){
     e.preventDefault(); if(!title || !description) return;
     setLoading(true); setError('');
     try {
-  const r = await apiPost('/api/ideas', { title, description });
+      await apiPost('/api/ideas', { title, description });
       setTitle(''); setDescription('');
       onCreated && onCreated();
     } catch(e){ setError(e.message); }
