@@ -28,6 +28,8 @@ Hot reload for the frontend occurs automatically via Vite. For backend/gateway/s
 docker compose build gateway && docker compose up -d gateway
 ```
 
+Embedded frontend (production style): The gateway Docker image now performs a multi-stage build that bundles the built React app into `/app/public` and serves it. Locally we still run a separate `frontend` container for fast dev; in production you only need the gateway (it serves `/` plus `/api/*`).
+
 ### Auth Model (Current)
 Frontend exposes Register & Login screens. Successful login stores JWT + email in `localStorage` and automatically adds a `Bearer` token to subsequent mutating requests.
 
@@ -61,6 +63,8 @@ The vote POST endpoint also derives a deterministic anonymous UUID fallback from
 
 ## Deployment (Current State)
 Deployed (simulation) on AWS EC2 inside an Auto Scaling Group behind an Application Load Balancer. User data (and/or manual steps) pull images from ECR and run containers. Root volume enlarged to 30GB to fit images. Health check: `GET /health` on gateway (port 8080) returns 200 through ALB.
+
+To expose the UI publicly via the ALB, push the updated `ideas-gateway` image (now containing static assets) and let the ASG launch a fresh instance; visiting the ALB DNS root (`http://<alb-dns>/`) loads the SPA.
 
 ### Future Hardening
 - Move Postgres/Redis/RabbitMQ to managed services (RDS / ElastiCache / Amazon MQ)

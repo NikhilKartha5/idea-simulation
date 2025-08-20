@@ -1,4 +1,6 @@
 import express from 'express';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
@@ -16,6 +18,7 @@ import { requireAuth } from './authMiddleware.js';
 dotenv.config();
 
 const app = express();
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const log = pino({ transport: { target: 'pino-pretty' } });
 
 app.use(helmet());
@@ -35,6 +38,10 @@ app.use(morgan('dev'));
 app.use(rateLimiter);
 
 app.get('/health', (_req, res) => res.json({ status: 'ok' }));
+
+// Static assets (built frontend injected at build time)
+const staticDir = path.join(__dirname, 'public');
+app.use(express.static(staticDir));
 
 // Auth proxy routes -> auth-service (open)
 const AUTH_BASE = 'http://auth-service:3004/auth';
@@ -60,6 +67,12 @@ app.post('/api/auth/login', async (req,res)=>{
 app.use('/api/ideas', ideasRouter);
 app.use('/api/votes', votesRouter);
 app.use('/api/comments', commentsRouter);
+
+// Fallback: serve index.html for non-API routes (client-side router)
+app.get(/^(?!\/api|\/health).*/, (req, res, next) => {
+  if (req.method !== 'GET') return next();
+  res.sendFile(path.join(staticDir, 'index.html'));
+});
 
 app.use((err, _req, res, _next) => {
   log.error(err);

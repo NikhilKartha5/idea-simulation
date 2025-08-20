@@ -1,7 +1,20 @@
-FROM node:20-alpine
+FROM node:20-alpine AS base
 WORKDIR /app
-COPY package.json package-lock.json* ./
+COPY gateway/package.json gateway/package-lock.json* ./
 RUN npm install --production
-COPY src ./src
+
+# Build frontend and copy its dist into gateway public folder
+FROM node:20-alpine AS frontend-build
+WORKDIR /frontend
+COPY ../frontend/package.json ../frontend/package-lock.json* ./
+RUN npm install
+COPY ../frontend .
+RUN npm run build
+
+FROM base AS runtime
+WORKDIR /app
+COPY gateway/src ./src
+COPY --from=frontend-build /frontend/dist ./public
+ENV NODE_ENV=production
 EXPOSE 8080
-CMD ["npm","start"]
+CMD ["node","src/index.js"]
