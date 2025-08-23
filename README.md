@@ -31,12 +31,27 @@ docker compose build gateway && docker compose up -d gateway
 Embedded frontend (production style): The gateway Docker image now performs a multi-stage build that bundles the built React app into `/app/public` and serves it. Locally we still run a separate `frontend` container for fast dev; in production you only need the gateway (it serves `/` plus `/api/*`).
 
 ### Auth Model (Current)
+
 Frontend exposes Register & Login screens. Successful login stores JWT + email in `localStorage` and automatically adds a `Bearer` token to subsequent mutating requests.
 
 Protected (JWT required):
 - POST /api/ideas
 - POST /api/votes
 - POST /api/comments
+
+---
+
+## Screenshots
+Below are some screenshots of the application in action:
+
+- **Home Page**
+  ![Home](./pics/Home%20(3).png)
+- **Dashboard**
+  ![Dashboard](./pics/dashboard%20(2).png)
+- **Login/Signup**
+  ![Login/Signup](./pics/loginsignup.png)
+- **Commenting**
+  ![Commenting](./pics/commenting.png)
 
 Public (no JWT required):
 - GET /api/ideas
