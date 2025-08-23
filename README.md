@@ -1,4 +1,5 @@
-# Idea Simulation Platform
+
+# Idea Incubator 
 
 Microservices web application for creating, searching, voting on, and commenting on ideas. Demonstrates distributed service design, messaging, caching, CI/CD and Terraform infrastructure. Now includes a minimal frontend authentication flow (register / login / logout) and selective endpoint protection.
 
