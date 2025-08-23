@@ -77,6 +77,13 @@ The vote POST endpoint also derives a deterministic anonymous UUID fallback from
 4. Search -> GET /api/ideas/search?q=term
 5. Top ideas -> GET /api/ideas/top
 
+
+## CI/CD & Cloud Deployment
+
+- Automated build, test, and deployment pipeline using Jenkins (see `Jenkinsfile`).
+- Infrastructure as Code: All AWS resources (EC2, VPC, ALB, Auto Scaling, ECR, IAM) provisioned via Terraform (see `infra/terraform/main.tf`).
+- Application is deployed on AWS EC2 instances behind a load balancer, with auto-scaling and secure networking.
+
 ## Deployment (Current State)
 Deployed (simulation) on AWS EC2 inside an Auto Scaling Group behind an Application Load Balancer. User data (and/or manual steps) pull images from ECR and run containers. Root volume enlarged to 30GB to fit images. Health check: `GET /health` on gateway (port 8080) returns 200 through ALB.
 
