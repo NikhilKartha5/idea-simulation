@@ -80,7 +80,6 @@ The vote POST endpoint also derives a deterministic anonymous UUID fallback from
 ## Deployment (Current State)
 Deployed (simulation) on AWS EC2 inside an Auto Scaling Group behind an Application Load Balancer. User data (and/or manual steps) pull images from ECR and run containers. Root volume enlarged to 30GB to fit images. Health check: `GET /health` on gateway (port 8080) returns 200 through ALB.
 
-To expose the UI publicly via the ALB, push the updated `ideas-gateway` image (now containing static assets) and let the ASG launch a fresh instance; visiting the ALB DNS root (`http://<alb-dns>/`) loads the SPA.
 
 ### Future Hardening
 - Move Postgres/Redis/RabbitMQ to managed services (RDS / ElastiCache / Amazon MQ)
